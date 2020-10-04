@@ -1,11 +1,13 @@
 package ru.nsu.g.beryanov.controller;
 
 import lombok.SneakyThrows;
-import org.opencv.core.Scalar;
+import org.assertj.core.util.Lists;
+import org.javatuples.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.nsu.g.beryanov.model.ImageTreeNode;
+import ru.nsu.g.beryanov.model.PixelMarking;
 import ru.nsu.g.beryanov.utility.ComputerVisionUtility;
 import ru.nsu.g.beryanov.view.ImagePanel;
 
@@ -312,7 +314,7 @@ public class SegmentationController {
 
             imageTreeNodeArray.remove(0);
         }
-        
+
         LinkedList<ImageTreeNode> imageTreeNodeLinkedList = new LinkedList<>();
         imageTreeNodeLinkedList.add(topNode);
 
@@ -386,5 +388,304 @@ public class SegmentationController {
 
         imagePanel.repaint();
         histogramController.updateHistogram();
+    }
+
+    double processCIEDE2000(double[] Lab_1, double[] Lab_2) {
+        double C_25_7 = 6103515625.0;
+
+        double L1 = Lab_1[0];
+        double a1 = Lab_1[1];
+        double b1 = Lab_1[2];
+
+        double L2 = Lab_2[0];
+        double a2 = Lab_2[1];
+        double b2 = Lab_2[2];
+
+        double C1 = Math.sqrt(Math.pow(a1, 2) + Math.pow(b1, 2));
+        double C2 = Math.sqrt(Math.pow(a2, 2) + Math.pow(b2, 2));
+        double C_ave = (C1 + C2) / 2;
+        double G = 0.5 * (1 - Math.sqrt(Math.pow(C_ave, 7) / (Math.pow(C_ave, 7) + C_25_7)));
+
+        double a1_ = (1 + G) * a1;
+        double a2_ = (1 + G) * a2;
+
+        double C1_ = Math.sqrt(Math.pow(a1_, 2) + Math.pow(b1, 2));
+        double C2_ = Math.sqrt(Math.pow(a2_, 2) + Math.pow(b2, 2));
+
+        double h1_;
+        if (b1 == 0 && a1_ == 0) {
+            h1_ = 0;
+        } else if (a1_ >= 0) {
+            h1_ = Math.atan2(b1, a1_);
+        } else {
+            h1_ = Math.atan2(b1, a1_) + 2 * Math.PI;
+        }
+
+        double h2_;
+        if (b2 == 0 && a2_ == 0) {
+            h2_ = 0;
+        } else if (a2_ >= 0) {
+            h2_ = Math.atan2(b2, a2_);
+        } else {
+            h2_ = Math.atan2(b2, a2_) + 2 * Math.PI;
+        }
+
+        double dL_ = L2 - L1;
+        double dC_ = C2_ - C1_;
+        double dh_ = h2_ - h1_;
+
+        if (C1_ * C2_ == 0) {
+            dh_ = 0;
+        } else if (dh_ > Math.PI) {
+            dh_ -= 2 * Math.PI;
+        } else if (dh_ < -Math.PI) {
+            dh_ += 2 * Math.PI;
+        }
+
+        double dH_ = 2 * Math.sqrt(C1_ * C2_) * Math.sin(dh_ / 2);
+
+        double L_ave = (L1 + L2) / 2;
+        C_ave = (C1_ + C2_) / 2;
+
+        double _dh = Math.abs(h1_ - h2_);
+        double _sh = h1_ + h2_;
+        double C1C2 = C1_ * C2_;
+
+        double h_ave;
+        if (_dh <= Math.PI && C1C2 != 0) {
+            h_ave = (h1_ + h2_) / 2;
+        } else if (_dh > Math.PI && _sh < 2 * Math.PI && C1C2 != 0) {
+            h_ave = (h1_ + h2_) / 2 + Math.PI;
+        } else if (_dh > Math.PI && _sh >= 2 * Math.PI && C1C2 != 0) {
+            h_ave = (h1_ + h2_) / 2 - Math.PI;
+        } else {
+            h_ave = h1_ + h2_;
+        }
+
+        double T = 1 - 0.17 * Math.cos(h_ave - Math.PI / 6) + 0.24 * Math.cos(2 * h_ave) + 0.32 * Math.cos(3 * h_ave + Math.PI / 30) - 0.2 * Math.cos(4 * h_ave - 63 * Math.PI / 180);
+
+        double h_ave_deg = h_ave * 180 / Math.PI;
+        if (h_ave_deg < 0) {
+            h_ave_deg += 360;
+        } else if (h_ave_deg > 360) {
+            h_ave_deg -= 360;
+        }
+
+        double dTheta = 30 * Math.exp(-(Math.pow((h_ave_deg - 275) / 25, 2)));
+
+        double R_C = 2 * Math.sqrt(Math.pow(C_ave, 7) / (Math.pow(C_ave, 7) + C_25_7));
+        double S_C = 1 + 0.045 * C_ave;
+        double S_H = 1 + 0.015 * C_ave * T;
+
+        double Lm50s = Math.pow(L_ave - 50, 2);
+        double S_L = 1 + 0.015 * Lm50s / Math.sqrt(20 + Lm50s);
+        double R_T = -Math.sin(dTheta * Math.PI / 90) * R_C;
+
+        double k_L = 1;
+        double k_C = 1;
+        double k_H = 1;
+
+        double f_L = dL_ / k_L / S_L;
+        double f_C = dC_ / k_C / S_C;
+        double f_H = dH_ / k_H / S_H;
+
+        return Math.sqrt(Math.pow(f_L, 2) + Math.pow(f_C, 2) + Math.pow(f_H, 2) + R_T * f_C * f_H);
+    }
+
+    Pair<int[][], Integer> processLabelsGetting() {
+        HashSet<Integer> colors = new HashSet<>();
+        HashMap<Integer, Integer> colorsLabels = new HashMap<>();
+
+        int label = 0;
+        int[][] labels = new int[ComputerVisionUtility.imageSize][ComputerVisionUtility.imageSize];
+        for (int i = 0; i < ComputerVisionUtility.imageSize; i++) {
+            for (int j = 0; j < ComputerVisionUtility.imageSize; j++) {
+                int color = imagePanel.getImage().getRGB(i, j);
+                if (colors.contains(color)) {
+                    labels[i][j] = colorsLabels.get(color);
+                } else {
+                    colors.add(color);
+                    colorsLabels.put(color, label);
+                    labels[i][j] = label;
+                    label++;
+                }
+            }
+        }
+
+        return new Pair<>(labels, label);
+    }
+
+    int[][] processSegmentsFinding(Pair<int[][], Integer> labelsAndColor) {
+        PixelMarking[][] pixelMarkings = new PixelMarking[ComputerVisionUtility.imageSize][ComputerVisionUtility.imageSize];
+        for (int i = 0; i < ComputerVisionUtility.imageSize; i++) {
+            for (int j = 0; j < ComputerVisionUtility.imageSize; j++) {
+                pixelMarkings[i][j] = new PixelMarking();
+            }
+        }
+
+        int[][] labelsNew = new int[ComputerVisionUtility.imageSize][ComputerVisionUtility.imageSize];
+        int[][] labels = labelsAndColor.getValue0();
+        int label = labelsAndColor.getValue1() * 2;
+
+        for (int l = 0; l < labelsAndColor.getValue1(); l++) {
+            HashMap<Integer, Integer> equivalentLabels = new HashMap<>();
+            for (int i = -1; i < ComputerVisionUtility.imageSize - 1; i++) {
+                for (int j = -1; j < ComputerVisionUtility.imageSize - 1; j++) {
+                    if (labels[i + 1][j + 1] != l) {
+                        if (i == -1 && j == -1) {
+                            label++;
+                            pixelMarkings[i + 1][j + 1].setLabeled(true);
+                            pixelMarkings[i + 1][j + 1].setLabel(label);
+                        } else if (i == -1) {
+                            if (!pixelMarkings[i + 1][j].isLabeled()) {
+                                label++;
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                pixelMarkings[i + 1][j + 1].setLabel(label);
+                            } else {
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i + 1][j].getLabel());
+                            }
+                        } else if (j == -1) {
+                            if (!pixelMarkings[i][j + 1].isLabeled()) {
+                                label++;
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                pixelMarkings[i + 1][j + 1].setLabel(label);
+                            } else {
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i][j + 1].getLabel());
+                            }
+                        } else {
+                            if (!pixelMarkings[i][j + 1].isLabeled() && !pixelMarkings[i + 1][j].isLabeled()) {
+                                label++;
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                pixelMarkings[i + 1][j + 1].setLabel(label);
+                            } else if (pixelMarkings[i][j + 1].isLabeled() ^ pixelMarkings[i + 1][j].isLabeled()) {
+                                pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                if (pixelMarkings[i][j + 1].isLabeled()) {
+                                    pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i][j + 1].getLabel());
+                                } else if (pixelMarkings[i + 1][j].isLabeled()) {
+                                    pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i + 1][j].getLabel());
+                                }
+                            } else if (pixelMarkings[i][j + 1].isLabeled() && pixelMarkings[i + 1][j].isLabeled()) {
+                                if (pixelMarkings[i][j + 1].getLabel() == pixelMarkings[i + 1][j].getLabel()) {
+                                    pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                    pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i + 1][j].getLabel());
+                                } else {
+                                    pixelMarkings[i + 1][j + 1].setLabeled(true);
+                                    pixelMarkings[i + 1][j + 1].setLabel(pixelMarkings[i][j + 1].getLabel());
+                                    equivalentLabels.put(pixelMarkings[i + 1][j].getLabel(), pixelMarkings[i][j + 1].getLabel());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (int i = 0; i < ComputerVisionUtility.imageSize; i++) {
+                for (int j = 0; j < ComputerVisionUtility.imageSize; j++) {
+                    int equivalentLabel;
+                    int previousLabel = pixelMarkings[i][j].getLabel();
+                    if ((equivalentLabel = equivalentLabels.getOrDefault(previousLabel, 0)) != 0) {
+                        equivalentLabels.entrySet().stream().filter(entry -> entry.getValue() == previousLabel).forEach(entry -> equivalentLabels.put(entry.getKey(), equivalentLabel));
+                        pixelMarkings[i][j].setLabel(equivalentLabel);
+                    }
+                }
+            }
+
+            for (int i = 0; i < ComputerVisionUtility.imageSize; i++) {
+                for (int j = 0; j < ComputerVisionUtility.imageSize; j++) {
+                    if (pixelMarkings[i][j].isLabeled()) {
+                        labelsNew[i][j] = pixelMarkings[i][j].getLabel();
+                    }
+                }
+            }
+        }
+
+        return labelsNew;
+    }
+
+    Pair<HashMap<Integer, ArrayList<Integer>>, int[][]> processConnections(int[][] labels) {
+        HashMap<Integer, ArrayList<Integer>> connections = new HashMap<>();
+        for (int i = 0; i < ComputerVisionUtility.imageSize; i++) {
+            for (int j = 0; j < ComputerVisionUtility.imageSize; j++) {
+                int label = labels[i][j];
+                try {
+                    if (labels[i - 1][j - 1] != label) {
+                        if (connections.containsKey(labels[i - 1][j - 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i - 1][j - 1]));
+                        }
+                    }
+                    if (labels[i][j - 1] != label) {
+                        if (connections.containsKey(labels[i][j - 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i][j - 1]));
+                        }
+                    }
+                    if (labels[i + 1][j - 1] != label) {
+                        if (connections.containsKey(labels[i + 1][j - 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i + 1][j - 1]));
+                        }
+                    }
+                    if (labels[i - 1][j] != label) {
+                        if (connections.containsKey(labels[i - 1][j])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i - 1][j]));
+                        }
+                    }
+                    if (labels[i + 1][j] != label) {
+                        if (connections.containsKey(labels[i + 1][j])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i + 1][j]));
+                        }
+                    }
+                    if (labels[i - 1][j + 1] != label) {
+                        if (connections.containsKey(labels[i - 1][j + 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i - 1][j + 1]));
+                        }
+                    }
+                    if (labels[i][j + 1] != label) {
+                        if (connections.containsKey(labels[i][j + 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i][j + 1]));
+                        }
+                    }
+                    if (labels[i + 1][j + 1] != label) {
+                        if (connections.containsKey(labels[i + 1][j + 1])) {
+                            if (!connections.get(label).contains(label)) {
+                                connections.get(label).add(label);
+                            }
+                        } else {
+                            connections.put(label, Lists.newArrayList(labels[i + 1][j + 1]));
+                        }
+                    }
+                } catch (ArrayIndexOutOfBoundsException ignored) {}
+            }
+        }
+
+        return new Pair<>(connections, labels);
     }
 }
