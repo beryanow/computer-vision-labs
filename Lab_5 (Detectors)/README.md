@@ -20,7 +20,7 @@
 ## Детектор углов Фёрстнера
 ![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_5%20(Detectors)/screenshots/Снимок%20экрана%202020-10-20%20в%2014.00.30.png?raw=true)
 
-## Детектор углов Фёрстнера (с иным порогом, лучшее распознавание)
+## Детектор углов Фёрстнера (с иным порогом, хорошее распознавание)
 ![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_5%20(Detectors)/screenshots/Снимок%20экрана%202020-10-20%20в%2014.01.09.png?raw=true)
 
 ## Детектор особых точек SIFT
