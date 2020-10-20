@@ -25,3 +25,6 @@
 
 ## Детектор особых точек SIFT
 ![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_5%20(Detectors)/screenshots/Снимок%20экрана%202020-10-20%20в%2013.54.35.png?raw=true)
+
+## Детектор особых точек SIFT
+![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_5%20(Detectors)/screenshots/Снимок%20экрана%202020-10-20%20в%2014.52.41.png?raw=true)
