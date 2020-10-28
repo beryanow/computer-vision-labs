@@ -365,13 +365,15 @@ public class DescriptorController {
                 }
                 imagePanel.getImage().setRGB((int) (i + size * 0.4 + y), (int) ((int) (2.1 * i) + x - size * 1.4), Color.RED.getRGB());
             }
-        } catch (ArrayIndexOutOfBoundsException ignored) {}
+        } catch (ArrayIndexOutOfBoundsException ignored) {
+        }
 
         try {
             for (int i = size - 1; i >= size / 2; i--) {
                 imagePanel.getImage().setRGB((int) (i + size * 0.4 + y), (int) ((int) (2.1 * (size - 1 - i)) + x - size * 1.4), Color.RED.getRGB());
             }
-        } catch (ArrayIndexOutOfBoundsException ignored) {}
+        } catch (ArrayIndexOutOfBoundsException ignored) {
+        }
 
         imagePanel.repaint();
         histogramController.updateHistogram();
@@ -688,13 +690,15 @@ public class DescriptorController {
                 }
                 triangle[(int) (2.1 * i)][i] = 1;
             }
-        } catch (ArrayIndexOutOfBoundsException ignored) {}
+        } catch (ArrayIndexOutOfBoundsException ignored) {
+        }
 
         try {
             for (int i = size - 1; i >= 0; i--) {
                 triangle[(int) (2.1 * (size - 1 - i))][i] = 1;
             }
-        } catch (ArrayIndexOutOfBoundsException ignored) {}
+        } catch (ArrayIndexOutOfBoundsException ignored) {
+        }
 
         return triangle;
     }
@@ -773,7 +777,8 @@ public class DescriptorController {
                         if (bestRelevant[i][j] < relevantAmount) {
                             bestRelevant[i][j] = relevantAmount;
                         }
-                    } catch (NotRelevantTemplateException ignored) {}
+                    } catch (NotRelevantTemplateException ignored) {
+                    }
                 }
             }
 
@@ -794,6 +799,59 @@ public class DescriptorController {
 //                            outlinePixelCircle(i, j, diameter);
                             outlinePixelTriangle(i, j, diameter);
 //                            outlinePixelSquare(i, j, diameter);
+                        }
+                    }
+                }
+            }
+        }
+
+        imagePanel.repaint();
+        histogramController.updateHistogram();
+    }
+
+    public void processHoughTransform() {
+        int[][] rgb = filterController.processSobelFilter();
+
+        int maxRadius = ComputerVisionUtility.imageSize;
+        int voting[][][] = new int[ComputerVisionUtility.imageSize - 1][ComputerVisionUtility.imageSize - 1][maxRadius];
+
+        int minimumRadius = 10;
+        int thetaIncrement = 2;
+
+        for (int i = 1; i < ComputerVisionUtility.imageSize - 1; i++) {
+            for (int j = 1; j < ComputerVisionUtility.imageSize - 1; j++) {
+                Color color = new Color(rgb[j][i]);
+                if (ComputerVisionUtility.evaluateHSV(color.getRed(), color.getGreen(), color.getBlue())[2] >= 20) {
+                    for (int radius = minimumRadius; radius < maxRadius; radius++) {
+                        for (int theta = 0; theta < 360; theta += thetaIncrement) {
+                            int a = (int) (j - radius * Math.cos(theta * Math.PI / 180));
+                            int b = (int) (i - radius * Math.sin(theta * Math.PI / 180));
+
+                            if (b < ComputerVisionUtility.imageSize - 1 && a < ComputerVisionUtility.imageSize - 1 && b >= 0 && a >= 0) {
+                                voting[a][b][radius] += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        int maxVote = 0;
+        int votingThreshold = 171;
+        for (int i = 1; i < ComputerVisionUtility.imageSize - 1; i++) {
+            for (int j = 1; j < ComputerVisionUtility.imageSize - 1; j++) {
+                for (int radius = minimumRadius; radius < maxRadius; radius++) {
+                    if (voting[j][i][radius] > votingThreshold) {
+                        if (voting[j][i][radius] > maxVote) {
+                            maxVote = voting[j][i][radius];
+                        }
+                        for (int theta = 0; theta < 360; theta += 1) {
+                            int a = (int) (j - radius * Math.cos(theta * Math.PI / 180));
+                            int b = (int) (i - radius * Math.sin(theta * Math.PI / 180));
+
+                            if (b < ComputerVisionUtility.imageSize - 1 && a < ComputerVisionUtility.imageSize - 1 && b >= 0 && a >= 0) {
+                                imagePanel.getImage().setRGB(a, b, Color.RED.getRGB());
+                            }
                         }
                     }
                 }

@@ -90,7 +90,7 @@ public class ComputerVisionConfiguration {
     @SneakyThrows
     @Bean(name = "imagePanel")
     public ImagePanel imagePanel() {
-        ComputerVisionUtility.imageName = "sign2";
+        ComputerVisionUtility.imageName = "sign4";
         File fileImage = new File("src/main/resources/" + ComputerVisionUtility.imageName + ".jpg");
 
         ComputerVisionUtility.defaultImage = ImageIO.read(fileImage);
@@ -294,6 +294,8 @@ public class ComputerVisionConfiguration {
         toolPanel.add(siftDetectorButton());
         toolPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         toolPanel.add(ransacDetectorButton());
+        toolPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        toolPanel.add(houghDetectorButton());
 
         return toolPanel;
     }
@@ -654,12 +656,22 @@ public class ComputerVisionConfiguration {
 
     @Bean("ransacDetectorButton")
     public JButton ransacDetectorButton() {
-        JButton ransac = new JButton("RANSAC");
+        JButton ransacDetectorButton = new JButton("RANSAC");
 
-        ransac.addActionListener(actionEvent -> descriptorController.processRANSAC());
-        ransac.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+        ransacDetectorButton.addActionListener(actionEvent -> descriptorController.processRANSAC());
+        ransacDetectorButton.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
 
-        return ransac;
+        return ransacDetectorButton;
+    }
+
+    @Bean("houghDetectorButton")
+    public JButton houghDetectorButton() {
+        JButton houghDetectorButton = new JButton("Хафф");
+
+        houghDetectorButton.addActionListener(actionEvent -> descriptorController.processHoughTransform());
+        houghDetectorButton.setAlignmentX(java.awt.Component.CENTER_ALIGNMENT);
+
+        return houghDetectorButton;
     }
 
     @Bean("forstnerDetectorButton")
