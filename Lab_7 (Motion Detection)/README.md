@@ -10,3 +10,6 @@
 
 ## Определение движения на изображениях выше
 ![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_7%20(Motion%20Detection)/screenshots/Снимок%20экрана%202020-11-09%20в%2014.44.46.png?raw=true)
+
+## Исходники изображений для сравнения
+![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_7%20(Motion%20Detection)/images/porshe1.jpg?raw=true) ![](https://github.com/beryanow/computer_vision_labs/blob/master/Lab_7%20(Motion%20Detection)/images/porshe2.jpg?raw=true)
