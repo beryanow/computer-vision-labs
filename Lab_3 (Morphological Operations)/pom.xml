@@ -9,7 +9,7 @@
     </parent>
 
     <groupId>ru.nsu.g.beryanov</groupId>
-    <artifactId>computer_vision_lab_1</artifactId>
+    <artifactId>computer_vision_lab_3</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <modelVersion>4.0.0</modelVersion>
 
